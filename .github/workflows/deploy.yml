@@ -65,24 +65,20 @@ jobs:
             git push
           fi
 
-      # Railway: refresh token → get access token → deploymentRedeploy
+      # Railway: use access token directly → deploymentRedeploy
       - name: Trigger Railway deployment
         if: steps.commit.outputs.did_commit == 'true'
         run: |
-          # Refresh Railway token
-          TOKEN_RESP=$(curl -s -X POST https://backboard.railway.com/oauth/token \
-            -H "Content-Type: application/x-www-form-urlencoded" \
-            -d "refresh_token=${{ secrets.RAILWAY_REFRESH_TOKEN }}&grant_type=refresh_token&client_id=railway__front-end")
-
-          ACCESS_TOKEN=$(echo "$TOKEN_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
-
           # Trigger Railway deployment via GraphQL mutation
-          MUTATION='{"query":"mutation { deploymentRedeploy(id: \"'${{ vars.RAILWAY_DEPLOYMENT_ID }}') { id status } }"}'
+          MUTATION="{\"query\":\"mutation { deploymentRedeploy(id: \\\"${{ vars.RAILWAY_DEPLOYMENT_ID }}\\\") { id status } }\"}"
 
-          curl -s -X POST https://backboard.railway.com/graphql/v2 \
+          RESULT=$(curl -s -X POST https://backboard.railway.com/graphql/v2 \
             -H "Content-Type: application/json" \
-            -H "Authorization: Bearer $ACCESS_TOKEN" \
-            -d "$MUTATION" | python3 -c "import sys,json; r=json.load(sys.stdin); print('Railway deployment triggered:', r)"
+            -H "Authorization: Bearer ${{ secrets.RAILWAY_ACCESS_TOKEN }}" \
+            -d "$MUTATION")
+
+          echo "Railway response: $RESULT"
+          echo "$RESULT" | python3 -c "import sys,json; r=json.load(sys.stdin); d=r.get('data',{}).get('deploymentRedeploy',{}); print(f\"Railway deployment triggered: {d.get('id','?')} ({d.get('status','?')})\")"
 
           echo "Waiting 60s for Railway to start building..."
           sleep 60
