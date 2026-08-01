@@ -15,6 +15,7 @@ env:
 
 permissions:
   contents: write  # needed to push built web output
+  contents: read   # needed to read commit info
 
 jobs:
   deploy:
@@ -48,28 +49,44 @@ jobs:
         run: cp server.py app/build/web/server.py
 
       - name: Commit & push built output
+        id: commit
         run: |
           # Stage built web output (force-add to override any gitignore entries)
           git add -f app/build/web/ || true
 
           # Check if there's anything to commit
           if git diff --cached --quiet; then
+            echo "did_commit=false" >> "$GITHUB_OUTPUT"
             echo "No changes to commit"
           else
+            echo "did_commit=true" >> "$GITHUB_OUTPUT"
             git -c user.name="github-actions[bot]" \
                 -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
                 commit -m "ci: build web $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
-
             git push
           fi
 
-      # Railway auto-deploys on push to main/dev via GitHub integration.
-      # If manual trigger, show instructions.
-      - name: Railway status
-        if: github.event_name == 'workflow_dispatch'
+      # Railway: refresh token → get access token → deploymentRedeploy
+      - name: Trigger Railway deployment
+        if: steps.commit.outputs.did_commit == 'true'
         run: |
-          echo "Manual deploy triggered. Railway should auto-deploy from the pushed commit."
-          echo "Check: https://railway.app/project/5980c116-966e-47a1-9abd-65e6b98cdfce"
+          # Refresh Railway token
+          TOKEN_RESP=$(curl -s -X POST https://backboard.railway.com/oauth/token \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "refresh_token=${{ secrets.RAILWAY_REFRESH_TOKEN }}&grant_type=refresh_token&client_id=railway__front-end")
+
+          ACCESS_TOKEN=$(echo "$TOKEN_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+
+          # Trigger Railway deployment via GraphQL mutation
+          MUTATION='{"query":"mutation { deploymentRedeploy(id: \"'${{ vars.RAILWAY_DEPLOYMENT_ID }}') { id status } }"}'
+
+          curl -s -X POST https://backboard.railway.com/graphql/v2 \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -d "$MUTATION" | python3 -c "import sys,json; r=json.load(sys.stdin); print('Railway deployment triggered:', r)"
+
+          echo "Waiting 60s for Railway to start building..."
+          sleep 60
 
       - id: deploy
         name: Set deployment URL
@@ -81,8 +98,8 @@ jobs:
           fi
 
       - name: Wait for Railway to deploy
-        if: github.event_name != 'workflow_dispatch'
-        run: sleep 20
+        if: steps.commit.outputs.did_commit == 'true'
+        run: sleep 30
 
       - name: Health check
         run: |
