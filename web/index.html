@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="PawPrint — AI Pet Health Tracker. Track weight, photos, medicine, and chat with a free AI assistant for your pet.">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="PawPrint">
+
+  <title>PawPrint</title>
+  <link rel="manifest" href="manifest.json">
+
+  <meta name="theme-color" content="#7A5AF8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+  <style>
+    html, body { margin: 0; padding: 0; background: #faf8ff; }
+    .loading {
+      display: flex; align-items: center; justify-content: center;
+      height: 100vh; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #5b21b6; flex-direction: column; gap: 16px;
+    }
+    .paw { font-size: 48px; }
+    .label { font-weight: 600; letter-spacing: 0.3px; }
+  </style>
+</head>
+<body>
+  <div class="loading" id="loading">
+    <div class="paw">🐾</div>
+    <div class="label">Loading PawPrint…</div>
+  </div>
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      var el = document.getElementById('loading');
+      if (el) el.remove();
+    });
+  </script>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>

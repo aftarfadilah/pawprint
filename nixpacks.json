@@ -1,0 +1,43 @@
+{
+  "$schema": "https://nixpacks.com/schema.json",
+  "builders": {
+    "dynamic": {
+      "enable": false
+    }
+  },
+  "phases": {
+    "setup": {
+      "nixpacksDeps": [
+        "flutter",
+        "curl",
+        "unzip"
+      ],
+      "cmds": [
+        "# Flutter is already in the Nixpacks image, verify it",
+        "flutter --version",
+        "# Clean Flutter precache for web only to save space",
+        "flutter config --no-analytics",
+        "flutter precache --web"
+      ]
+    },
+    "build": {
+      "depends": ["setup"],
+      "cmds": [
+        "flutter pub get",
+        "flutter build web --release --no-tree-shake-icons"
+      ],
+      "env": {
+        "FLUTTER_ROOT": "/nix/store/flutter-{{ .NixpkgsVersion }}",
+        "FLUTTER_VERSION": "{{ .NixpkgsFlutterVersion }}"
+      }
+    },
+    "start": {
+      "depends": ["build"],
+      "cmds": [
+        "cd build/web",
+        "python3 -m http.server 8080"
+      ],
+      "port": 8080
+    }
+  }
+}

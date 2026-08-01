@@ -1,0 +1,28 @@
+# Compiled files
+build/
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local env / secrets (never commit these)
+.env
+.env.local
+*.local
+
+# Flutter build output — built by CI, not committed
+build/
+
+# Railway / deployment artifacts
+.railway/

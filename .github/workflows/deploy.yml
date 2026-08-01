@@ -1,0 +1,73 @@
+name: Deploy to Railway
+
+on:
+  push:
+    branches:
+      - main      # production
+      - dev       # preview
+  workflow_dispatch:  # manual trigger
+
+env:
+  RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+jobs:
+  deploy:
+    name: Deploy to Railway (${{ github.ref_name }})
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.ref_name == 'main' && 'production' || 'preview' }}
+      url: ${{ steps.deploy.outputs.url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.8"
+          channel: "stable"
+          cache: true
+
+      - name: Install deps
+        run: flutter pub get
+
+      - name: Build Flutter web
+        run: flutter build web --release --no-tree-shake-icons
+
+      # ── Deploy ──────────────────────────────────────────────────────────
+      - name: Deploy to Railway (production / main)
+        if: github.ref_name == 'main'
+        id: deploy
+        run: |
+          echo "Deploying PRODUCTION..."
+          railway up --project-id ${{ vars.RAILWAY_PROJECT_ID }} --service pawprint-prod --environment production --detach
+          echo "url=https://pawprint-prod.up.railway.app" >> "$GITHUB_OUTPUT"
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      - name: Deploy to Railway (preview / dev)
+        if: github.ref_name == 'dev'
+        id: deploy-preview
+        run: |
+          echo "Deploying PREVIEW..."
+          railway up --project-id ${{ vars.RAILWAY_PROJECT_ID }} --service pawprint-dev --environment preview --detach
+          echo "url=https://pawprint-dev.up.railway.app" >> "$GITHUB_OUTPUT"
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      # ── Wait + health check ─────────────────────────────────────────────
+      - name: Wait for deployment
+        run: sleep 30
+
+      - name: Health check
+        run: |
+          URL="${{ github.ref_name == 'main' && 'https://pawprint-prod.up.railway.app' || 'https://pawprint-dev.up.railway.app' }}"
+          echo "Checking: $URL"
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL" --max-time 30)
+          echo "HTTP status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "::warning::Health check returned $STATUS — Railway may still be starting up"
+          else
+            echo "✓ App is live at $URL"
+          fi
