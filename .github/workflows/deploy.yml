@@ -50,7 +50,7 @@ jobs:
           echo "Deploying to Railway (${{ github.ref_name }}) → env=$RAILWAY_ENV..."
           cd build/web
           railway up \
-            --project-id ${{ vars.RAILWAY_PROJECT_ID }} \
+            --project ${{ vars.RAILWAY_PROJECT_ID }} \
             --environment "$RAILWAY_ENV" \
             --service pawprint \
             --detach \
