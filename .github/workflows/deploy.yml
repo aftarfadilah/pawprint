@@ -13,6 +13,9 @@ on:
 env:
   FLUTTER_VERSION: "3.44.8"
 
+permissions:
+  contents: write  # needed to push built web output
+
 jobs:
   deploy:
     name: Build & Deploy (${{ github.ref_name }})
