@@ -1,5 +1,8 @@
 # Compiled files
 build/
+# Exception: Railway CI commits app/build/web/ (see deploy.yml)
+!app/build/
+
 .dart_tool/
 .packages
 .pub-cache/
@@ -21,14 +24,8 @@ Thumbs.db
 .env.local
 *.local
 
-# Flutter build output
-build/
-# NOTE: app/build/web/ is intentionally tracked (committed by CI for Railway to serve)
-
-# Flutter plugins (machine-specific)
-.flutter-plugins
-.flutter-plugins-dependencies
-.packages
-
 # Railway / deployment artifacts
 .railway/
+
+# Legacy scripts
+scripts/
