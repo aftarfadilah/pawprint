@@ -14,8 +14,7 @@ env:
   FLUTTER_VERSION: "3.44.8"
 
 permissions:
-  contents: write  # needed to push built web output
-  contents: read   # needed to read commit info
+  contents: write  # needed to push built web output + read commit info
 
 jobs:
   deploy:
