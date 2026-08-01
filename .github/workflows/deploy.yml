@@ -49,9 +49,10 @@ jobs:
           RAILWAY_ENV="${{ github.ref_name == 'main' && 'production' || 'dev' }}"
           echo "Deploying to Railway (${{ github.ref_name }}) → env=$RAILWAY_ENV..."
           cd build/web
-          railway up \
+          railway link \
             --project ${{ vars.RAILWAY_PROJECT_ID }} \
-            --environment "$RAILWAY_ENV" \
+            --environment "$RAILWAY_ENV"
+          railway up \
             --service pawprint \
             --detach \
             --no-gitignore \
