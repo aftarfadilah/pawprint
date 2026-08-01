@@ -35,35 +35,43 @@ jobs:
       - name: Build Flutter web
         run: flutter build web --release --no-tree-shake-icons
 
-      # Copy server.py into build output (Railway runs Python to serve static files)
-      - name: Copy server script
-        run: cp server.py build/web/server.py
-
-      # ── Deploy to Railway ─────────────────────────────────────────────────
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
+      # Copy server.py and deploy script into build output
+      - name: Copy runtime files
+        run: |
+          cp server.py build/web/server.py
+          cp railway_api.py build/web/railway_api.py
 
       - name: Deploy to Railway
         id: deploy
+        working-directory: build/web
         run: |
-          RAILWAY_ENV="${{ github.ref_name == 'main' && 'production' || 'dev' }}"
-          echo "Deploying to Railway (${{ github.ref_name }}) → env=$RAILWAY_ENV..."
-          cd build/web
-          railway link \
-            --project ${{ vars.RAILWAY_PROJECT_ID }} \
-            --environment "$RAILWAY_ENV"
-          railway up \
-            --service pawprint \
-            --detach \
-            --no-gitignore \
-            --message "Deploy ${{ github.ref_name }}: ${{ github.sha }}"
+          # Set environment IDs based on branch
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            echo "Deploying to PRODUCTION..."
+            export RAILWAY_ENV_ID="dc99abf3-3eb5-406b-8cbe-db2631264298"
+          else
+            echo "Deploying to DEV..."
+            export RAILWAY_ENV_ID="78e05a69-a114-4974-8cc3-fdfa43b92048"
+          fi
+          export RAILWAY_PROJECT_ID="${{ vars.RAILWAY_PROJECT_ID }}"
+          export RAILWAY_SERVICE_ID="408e43a0-8468-43c9-b1a6-6c2c1da44cb6"
+          export RAILWAY_REFRESH_TOKEN="${{ secrets.RAILWAY_REFRESH_TOKEN }}"
+          export GITHUB_REF_NAME="${{ github.ref_name }}"
+          export GITHUB_SHA="${{ github.sha }}"
+
+          echo "env ID: $RAILWAY_ENV_ID"
+          echo "service ID: $RAILWAY_SERVICE_ID"
+
+          # Run Python deployer
+          python3 railway_api.py
+
           echo "url=https://pawprint.up.railway.app" >> "$GITHUB_OUTPUT"
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 
       # ── Wait + health check ───────────────────────────────────────────────
       - name: Wait for deployment
-        run: sleep 30
+        run: sleep 15
 
       - name: Health check
         run: |
