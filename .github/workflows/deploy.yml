@@ -46,8 +46,8 @@ jobs:
 
       - name: Commit & push built output
         run: |
-          # Stage built web output
-          git add app/build/web/ || true
+          # Stage built web output (force-add to override any gitignore entries)
+          git add -f app/build/web/ || true
 
           # Check if there's anything to commit
           if git diff --cached --quiet; then
