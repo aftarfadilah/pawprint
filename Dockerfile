@@ -5,7 +5,7 @@ RUN apt-get update && apt-get install -y curl git unzip xz-utils zip libglu1-mes
     rm -rf /var/lib/apt/lists/*
 
 # Install Flutter SDK (exact version for this project)
-ARG FLUTTER_VERSION=3.24.0
+ARG FLUTTER_VERSION=3.44.8
 ENV FLUTTER_VERSION=${FLUTTER_VERSION}
 RUN curl -fsSL "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_${FLUTTER_VERSION}-stable.tar.xz" | tar xJ -C /opt && \
     ln -s /opt/flutter/bin/flutter /usr/local/bin/flutter && \
