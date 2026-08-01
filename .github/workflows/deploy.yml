@@ -43,11 +43,12 @@ jobs:
       - name: Deploy to Railway
         id: deploy
         run: |
-          echo "Deploying to Railway (${{ github.ref_name }})..."
+          RAILWAY_ENV="${{ github.ref_name == 'main' && 'production' || 'dev' }}"
+          echo "Deploying to Railway (${{ github.ref_name }}) → env=$RAILWAY_ENV..."
           cd build/web
           railway up \
             --project-id ${{ vars.RAILWAY_PROJECT_ID }} \
-            --environment ${{ github.ref_name == 'main' && 'production' || 'dev' }} \
+            --environment "$RAILWAY_ENV" \
             --service pawprint \
             --detach \
             --no-gitignore \
