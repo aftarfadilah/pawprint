@@ -48,6 +48,5 @@ COPY --from=builder /app/app/build/web/ ./
 ENV PORT=8080
 EXPOSE 8080
 
-# Use Python's built-in HTTP server — handles Flutter SPA routing fine
-# Railway's load balancer handles HTTPS termination
-CMD ["python3", "-m", "http.server", "8080"]
+# Use the SPA-aware server for Flutter routing fallback
+CMD ["python3", "server.py"]
