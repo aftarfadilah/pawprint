@@ -3,16 +3,19 @@ name: Deploy to Railway
 on:
   push:
     branches:
-      - main      # production
-      - dev       # preview
+      - main
+      - dev
+    paths:
+      - "app/**"      # Flutter source → trigger build
+      - "Dockerfile"  # Dockerfile change → Railway rebuilds
   workflow_dispatch:  # manual trigger
 
 env:
-  RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+  FLUTTER_VERSION: "3.24.0"
 
 jobs:
   deploy:
-    name: Deploy to Railway (${{ github.ref_name }})
+    name: Build & Deploy (${{ github.ref_name }})
     runs-on: ubuntu-latest
     environment:
       name: ${{ github.ref_name == 'main' && 'production' || 'preview' }}
@@ -21,66 +24,71 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: true
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.44.8"
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: "stable"
           cache: true
 
-      - name: Install deps
-        run: flutter pub get
-
       - name: Build Flutter web
-        run: flutter build web --release --no-tree-shake-icons
-
-      # Copy server.py and deploy script into build output
-      - name: Copy runtime files
         run: |
-          cp server.py build/web/server.py
-          cp railway_api.py build/web/railway_api.py
+          cd app
+          flutter pub get
+          flutter build web --release --no-tree-shake-icons
 
-      - name: Deploy to Railway
-        id: deploy
-        working-directory: build/web
+      - name: Copy server.py into built output
+        run: cp server.py app/build/web/server.py
+
+      - name: Commit & push built output
         run: |
-          # Set environment IDs based on branch
-          if [ "${{ github.ref_name }}" = "main" ]; then
-            echo "Deploying to PRODUCTION..."
-            export RAILWAY_ENV_ID="dc99abf3-3eb5-406b-8cbe-db2631264298"
+          # Stage built web output
+          git add app/build/web/ || true
+
+          # Check if there's anything to commit
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
           else
-            echo "Deploying to DEV..."
-            export RAILWAY_ENV_ID="78e05a69-a114-4974-8cc3-fdfa43b92048"
+            git -c user.name="github-actions[bot]" \
+                -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+                commit -m "ci: build web $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+
+            git push
           fi
-          export RAILWAY_PROJECT_ID="${{ vars.RAILWAY_PROJECT_ID }}"
-          export RAILWAY_SERVICE_ID="408e43a0-8468-43c9-b1a6-6c2c1da44cb6"
-          export RAILWAY_REFRESH_TOKEN="${{ secrets.RAILWAY_REFRESH_TOKEN }}"
-          export GITHUB_REF_NAME="${{ github.ref_name }}"
-          export GITHUB_SHA="${{ github.sha }}"
 
-          echo "env ID: $RAILWAY_ENV_ID"
-          echo "service ID: $RAILWAY_SERVICE_ID"
+      # Railway auto-deploys on push to main/dev via GitHub integration.
+      # If manual trigger, show instructions.
+      - name: Railway status
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          echo "Manual deploy triggered. Railway should auto-deploy from the pushed commit."
+          echo "Check: https://railway.app/project/5980c116-966e-47a1-9abd-65e6b98cdfce"
 
-          # Run Python deployer
-          python3 railway_api.py
+      - id: deploy
+        name: Set deployment URL
+        run: |
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            echo "url=https://pawprint.up.railway.app" >> "$GITHUB_OUTPUT"
+          else
+            echo "url=https://pawprint-dev.up.railway.app" >> "$GITHUB_OUTPUT"
+          fi
 
-          echo "url=https://pawprint.up.railway.app" >> "$GITHUB_OUTPUT"
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-
-      # ── Wait + health check ───────────────────────────────────────────────
-      - name: Wait for deployment
-        run: sleep 15
+      - name: Wait for Railway to deploy
+        if: github.event_name != 'workflow_dispatch'
+        run: sleep 20
 
       - name: Health check
         run: |
-          URL="https://pawprint.up.railway.app"
+          URL="${{ github.ref_name == 'main' && 'https://pawprint.up.railway.app' || 'https://pawprint-dev.up.railway.app' }}"
           echo "Checking: $URL"
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL" --max-time 30)
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL" --max-time 30 --retry 3 --retry-delay 5)
           echo "HTTP status: $STATUS"
-          if [ "$STATUS" != "200" ]; then
-            echo "::warning::Health check returned $STATUS — Railway may still be starting up"
-          else
+          if [ "$STATUS" = "200" ]; then
             echo "✓ App is live at $URL"
+          else
+            echo "::warning::Health check returned $STATUS — Railway may still be starting up"
           fi

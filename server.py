@@ -1,19 +1,20 @@
-#!/usr/bin/env python3
 """
-Simple static file server for PawPrint Flutter web app on Railway.
-Serves index.html for all routes (Flutter SPA routing).
+Simple Python HTTP server for serving Flutter web build.
+Railway sets PORT env var; this script respects it.
 """
-import os
 import http.server
-import socketserver
+import os
 
 PORT = int(os.environ.get("PORT", 8080))
-DIRECTORY = os.path.dirname(os.path.abspath(__file__))
-
+DIRECTORY = os.path.dirname(os.path.abspath(__file__)) or "."
 
 class SPAHandler(http.server.SimpleHTTPRequestHandler):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, directory=DIRECTORY, **kwargs)
+    """Serves index.html for any path that doesn't match a file — enables Flutter routing."""
+
+    def end_headers(self):
+        # Railway injects these headers automatically; we just add ours
+        self.send_header("X-Content-Type-Options", "nosniff")
+        super().end_headers()
 
     def do_GET(self):
         # Try exact file first
@@ -21,22 +22,25 @@ class SPAHandler(http.server.SimpleHTTPRequestHandler):
         if os.path.isfile(path):
             return super().do_GET()
 
-        # Fallback to index.html (Flutter SPA routing)
-        index_path = os.path.join(DIRECTORY, "index.html")
-        if os.path.isfile(index_path):
+        # Fallback to index.html for Flutter routing
+        index = os.path.join(DIRECTORY, "index.html")
+        if os.path.isfile(index):
             self.path = "/index.html"
             return super().do_GET()
 
         # 404
         self.send_response(404)
+        self.send_header("Content-Type", "text/plain")
         self.end_headers()
         self.wfile.write(b"404 Not Found")
 
     def log_message(self, format, *args):
-        print(f"[PawPrint] {args[0]}")
+        # Keep logs quiet in production
+        pass
 
 
 if __name__ == "__main__":
-    with socketserver.TCPServer(("", PORT), SPAHandler) as httpd:
-        print(f"[PawPrint] Serving on port {PORT} from {DIRECTORY}")
+    os.chdir(DIRECTORY)
+    print(f"Serving {DIRECTORY} on port {PORT}")
+    with http.server.HTTPServer(("", PORT), SPAHandler) as httpd:
         httpd.serve_forever()
